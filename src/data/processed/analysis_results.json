@@ -1,0 +1,37 @@
+{
+    "rating_stats": {
+        "mean_rating": 4.402222222222222,
+        "median_rating": 5.0,
+        "rating_std": 1.0763687383861564,
+        "rating_counts": {
+            "1": 29,
+            "2": 2,
+            "3": 26,
+            "4": 95,
+            "5": 298
+        }
+    },
+    "sentiment_stats": {
+        "mean_sentiment": 0.38820599516369814,
+        "median_sentiment": 0.38793055555555556,
+        "sentiment_std": 0.19059995359730847,
+        "positive_reviews": 437,
+        "negative_reviews": 5,
+        "neutral_reviews": 8
+    },
+    "category_stats": {
+        "total_categories": 4,
+        "top_categories": {
+            "BoAt": 150,
+            "realme": 150,
+            "OnePlus": 100,
+            "U&I": 50
+        }
+    },
+    "length_stats": {
+        "mean_length": 42.57555555555555,
+        "median_length": 37.0,
+        "max_length": 101,
+        "min_length": 1
+    }
+}

@@ -1,0 +1,2 @@
+total_reviews,mean_rating,median_rating,rating_std,mean_sentiment,median_sentiment,sentiment_std,positive_reviews,negative_reviews,total_categories,mean_length,median_length,max_length,min_length
+450,4.402222222222222,5.0,1.0763687383861564,0.38820599516369814,0.38793055555555556,0.19059995359730847,437,5,4,42.57555555555555,37.0,101,1
