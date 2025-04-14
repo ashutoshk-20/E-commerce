@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Product Detail</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body class="p-4">
+    <div class="container">
+        <h2 class="mb-4">Product Details</h2>
+
+        <!-- Display the product image if available -->
+        {% if product.ImageURL %}
+        <div class="mb-4 text-center">
+            <img src="{{ product.ImageURL }}" alt="{{ product.Name }}" class="img-fluid" style="max-height: 300px;">
+        </div>
+        {% endif %}
+
+        <ul class="list-group">
+            <li class="list-group-item"><strong>_id:</strong> {{ product._id }}</li>
+            {% if product.Name %}
+                <li class="list-group-item"><strong>Name:</strong> {{ product.Name }}</li>
+            {% endif %}
+            {% if product.Brand %}
+                <li class="list-group-item"><strong>Brand:</strong> {{ product.Brand }}</li>
+            {% endif %}
+            {% if product.price %}
+                <li class="list-group-item"><strong>Price:</strong> ${{ product.price }}</li>
+            {% endif %}
+            {% if product.ID %}
+                <li class="list-group-item"><strong>ID:</strong> {{ product.ID }}</li>
+            {% endif %}
+            {% if product.ProdID %}
+                <li class="list-group-item"><strong>ProdID:</strong> {{ product.ProdID }}</li>
+            {% endif %}
+            {% if product.Rating is defined %}
+                <li class="list-group-item"><strong>Rating:</strong> {{ product.Rating }}</li>
+            {% endif %}
+            {% if product.ReviewCount is defined %}
+                <li class="list-group-item"><strong>Review Count:</strong> {{ product.ReviewCount }}</li>
+            {% endif %}
+            {% if product.Category %}
+                <li class="list-group-item"><strong>Category:</strong> {{ product.Category }}</li>
+            {% endif %}
+            {% if product.Tags %}
+                <li class="list-group-item"><strong>Tags:</strong> {{ product.Tags }}</li>
+            {% endif %}
+        </ul>
+
+        <a href="/" class="btn btn-secondary mt-4">← Back to Products</a>
+    </div>
+</body>
+</html>
