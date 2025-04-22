@@ -15,7 +15,7 @@
         </div>
         {% endif %}
 
-        <ul class="list-group">
+        <ul class="list-group mb-4">
             <li class="list-group-item"><strong>_id:</strong> {{ product._id }}</li>
             {% if product.Name %}
                 <li class="list-group-item"><strong>Name:</strong> {{ product.Name }}</li>
@@ -46,7 +46,30 @@
             {% endif %}
         </ul>
 
-        <a href="/" class="btn btn-secondary mt-4">← Back to Products</a>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary mb-4">← Back to Products</a>
+
+        <!-- 🔥 Recommended Products Section -->
+        {% if recommendations %}
+        <h4 class="mt-5">You may also like</h4>
+        <div class="row mt-3">
+            {% for rec in recommendations %}
+            <div class="col-md-3 mb-3">
+                <div class="card h-100 shadow-sm">
+                    {% if rec.ImageURL %}
+                    <img src="{{ rec.ImageURL }}" class="card-img-top" alt="{{ rec.Name }}" style="height: 150px; object-fit: cover;">
+                    {% endif %}
+                    <div class="card-body p-2">
+                        <h6 class="card-title mb-1">{{ rec.Name or 'No Name' }}</h6>
+                        {% if rec.price %}
+                        <p class="card-text text-muted mb-1">$ {{ rec.price }}</p>
+                        {% endif %}
+                        <a href="{{ url_for('product_detail', product_id=rec._id) }}" class="btn btn-sm btn-outline-primary btn-block">View</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
 </body>
 </html>
