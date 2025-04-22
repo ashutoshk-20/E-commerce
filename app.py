@@ -5,7 +5,6 @@ from bson.objectid import ObjectId
 
 app = Flask(__name__)
 
-# MongoDB Connection
 client = MongoClient("mongodb://localhost:27017/")
 db = client["product_data"]
 collection = db["products"]
@@ -37,7 +36,6 @@ def product_detail(product_id):
         if not product:
             return "Product not found", 404
 
-        # Basic product recommendation: match Brand or Category (excluding current)
         recommendations = collection.find({
             "$or": [
                 {"Brand": product.get("Brand", "")},
@@ -50,7 +48,6 @@ def product_detail(product_id):
     except Exception as e:
         return f"Invalid product ID. Error: {e}", 400
 
-# Autocomplete suggestions for search input
 @app.route('/suggest')
 def suggest():
     query = request.args.get('q', '')
