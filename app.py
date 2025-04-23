@@ -2,12 +2,22 @@ from flask import Flask, render_template, request, jsonify
 from pymongo import MongoClient
 from flask_paginate import Pagination, get_page_args
 from bson.objectid import ObjectId
+from openai import OpenAI
+from dotenv import load_dotenv
+import os
 
+load_dotenv()
 app = Flask(__name__)
 
-client = MongoClient("mongodb://localhost:27017/")
-db = client["product_data"]
+mongo_client = MongoClient(os.getenv("MONGO_URI"))
+db = mongo_client["product_data"]
 collection = db["products"]
+
+openai_client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=os.getenv("OPENROUTER_API_KEY")
+)
+openrouter_model = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-r1-zero:free")
 
 @app.route('/')
 def index():
@@ -25,8 +35,8 @@ def index():
 
     total = collection.count_documents(search_filter)
     products = list(collection.find(search_filter).skip(offset).limit(per_page))
-
     pagination = Pagination(page=page, per_page=per_page, total=total, css_framework='bootstrap4')
+
     return render_template('products.html', products=products, pagination=pagination)
 
 @app.route('/product/<product_id>')
@@ -61,6 +71,34 @@ def suggest():
 
     suggestions = [item['Name'] for item in results if 'Name' in item]
     return jsonify(suggestions)
+@app.route('/chat', methods=['POST'])
+def chat():
+    user_input = request.json.get("message")
+
+    if not user_input:
+        return jsonify({'error': 'No message received'}), 400
+
+    try:
+        response = openai_client.chat.completions.create(
+            model=openrouter_model,
+            messages=[
+                {"role": "user", "content": user_input}
+            ],
+            extra_headers={
+                "HTTP-Referer": "http://localhost:5001/",
+                "X-Title": "ProductBot"
+            }
+        )
+
+        message = response.choices[0].message.content
+        return jsonify({'response': message})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/chat')
+def chat_ui():
+    return render_template('chat.html')
 
 if __name__ == '__main__':
-    app.run(debug=True, use_reloader=False, threaded=False, port=5001)
+    app.run(debug=True, port=5001)

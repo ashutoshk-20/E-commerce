@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat with us!</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 2rem; }
+        .chat-box { width: 100%; max-width: 800px; margin: auto; border: 1px solid #ccc; padding: 1rem; height: 400px; overflow-y: scroll; }
+        .message { margin: 10px 0; }
+        .user { color: blue; }
+        .bot { color: green; white-space: pre-wrap; }
+        #input { width: 80%; padding: 0.5rem; }
+        button { padding: 0.5rem 1rem; }
+    </style>
+</head>
+<body>
+    <h2>Chat with us!</h2>
+    <div class="chat-box" id="chat-box"></div>
+    <input type="text" id="input" placeholder="Type a message..." />
+    <button onclick="sendMessage()">Send</button>
+
+    <script>
+        async function sendMessage() {
+            const input = document.getElementById('input');
+            const msg = input.value.trim();
+            if (!msg) return;
+
+            addMessage("You", msg, "user");
+            input.value = "";
+
+            const response = await fetch("/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: msg })
+            });
+
+            const data = await response.json();
+            if (data.response) {
+                addMessage("Bot", data.response, "bot");
+            } else {
+                addMessage("Bot", "Error: " + (data.error || "Unknown error"), "bot");
+            }
+        }
+
+        function addMessage(sender, text, cls) {
+            const box = document.getElementById('chat-box');
+            const div = document.createElement("div");
+            div.classList.add("message", cls);
+            div.innerHTML = `<strong>${sender}:</strong> ${text}`;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+    </script>
+</body>
+</html>
