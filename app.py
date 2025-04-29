@@ -5,6 +5,7 @@ from bson.objectid import ObjectId
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
+import threading
 
 load_dotenv()
 app = Flask(__name__)
@@ -19,10 +20,15 @@ openai_client = OpenAI(
 )
 openrouter_model = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-r1-zero:free")
 
+# Flag for graceful shutdown
+shutdown_flag = threading.Event()
+
 @app.route('/')
 def index():
     query = request.args.get('q', '')
-    page, per_page, offset = get_page_args(page_parameter='page', per_page_parameter='per_page')
+    # Decode and clean the query to remove excessive padding
+    query = query.strip('+') if query else ''
+    page, per_page, offset = get_page_args(page_parameter='page', per_page_parameter='per_page', per_page=6)
 
     search_filter = {}
     if query:
@@ -35,9 +41,24 @@ def index():
 
     total = collection.count_documents(search_filter)
     products = list(collection.find(search_filter).skip(offset).limit(per_page))
-    pagination = Pagination(page=page, per_page=per_page, total=total, css_framework='bootstrap4')
+    pagination = Pagination(
+        page=page,
+        per_page=per_page,
+        total=total,
+        css_framework='bootstrap4',
+        outer_class='inline-flex space-x-2 items-center',
+        prev_label='«',
+        next_label='»',
+        format_total=True,
+        format_number=True,
+        page_parameter='page',
+        link_class='px-3 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors duration-200',
+        active_class='bg-blue-600 text-white',
+        disabled_class='opacity-50 cursor-not-allowed',
+        dotdot_label='...'
+    )
 
-    return render_template('products.html', products=products, pagination=pagination)
+    return render_template('products.html', products=products, pagination=pagination, query=query)
 
 @app.route('/product/<product_id>')
 def product_detail(product_id):
@@ -66,11 +87,12 @@ def suggest():
 
     results = collection.find(
         {"Name": {"$regex": f'^{query}', "$options": "i"}},
-        {"Name": 1}
+        {"Name": 1, "_id": 0}
     ).limit(10)
 
     suggestions = [item['Name'] for item in results if 'Name' in item]
     return jsonify(suggestions)
+
 @app.route('/chat', methods=['POST'])
 def chat():
     user_input = request.json.get("message")
@@ -100,5 +122,26 @@ def chat():
 def chat_ui():
     return render_template('chat.html')
 
+@app.route('/shutdown', methods=['POST'])
+def shutdown():
+    shutdown_flag.set()
+    func = request.environ.get('werkzeug.server.shutdown')
+    if func is None:
+        raise RuntimeError('Not running with the Werkzeug Server')
+    func()
+    return jsonify({"message": "Server is shutting down..."})
+
+def run_server():
+    app.run(debug=True, port=5001, use_reloader=False)
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+    server_thread = threading.Thread(target=run_server)
+    server_thread.start()
+    try:
+        while not shutdown_flag.is_set():
+            shutdown_flag.wait(timeout=1)
+    except KeyboardInterrupt:
+        shutdown_flag.set()
+    finally:
+        server_thread.join()
+    print("Server stopped gracefully.")
