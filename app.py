@@ -1,33 +1,40 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from pymongo import MongoClient
 from flask_paginate import Pagination, get_page_args
+from flask_cors import CORS
 from bson.objectid import ObjectId
 from openai import OpenAI
-from dotenv import load_dotenv
-import os
 import threading
+import pyotp
+import logging
 
-load_dotenv()
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
+app.secret_key = "your_secret_key"  
 
-mongo_client = MongoClient(os.getenv("MONGO_URI"))
+MONGO_URI = "mongodb://localhost:27017/" 
+OPENROUTER_API_KEY = "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"  
+OPENROUTER_MODEL = "deepseek/deepseek-r1-zero:free"  
+
+mongo_client = MongoClient(MONGO_URI)
 db = mongo_client["product_data"]
 collection = db["products"]
+users_collection = db["users"]
 
 openai_client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
-    api_key=os.getenv("OPENROUTER_API_KEY")
+    api_key=OPENROUTER_API_KEY
 )
-openrouter_model = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-r1-zero:free")
+openrouter_model = OPENROUTER_MODEL
 
-# Flag for graceful shutdown
+CORS(app)
 shutdown_flag = threading.Event()
 
 @app.route('/')
 def index():
-    query = request.args.get('q', '')
-    # Decode and clean the query to remove excessive padding
-    query = query.strip('+') if query else ''
+    query = request.args.get('q', '').strip('+')
     page, per_page, offset = get_page_args(page_parameter='page', per_page_parameter='per_page', per_page=6)
 
     search_filter = {}
@@ -58,7 +65,101 @@ def index():
         dotdot_label='...'
     )
 
-    return render_template('products.html', products=products, pagination=pagination, query=query)
+    user_email = session.get('user_email', None)
+    return render_template('products.html', products=products, pagination=pagination, query=query, user_email=user_email)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        if 'step' not in session or session.get('step') == 'initial':
+            try:
+                email = request.form['email']
+                password = request.form['password']
+            except KeyError as e:
+                logger.error(f"Missing form field in login: {e}")
+                return render_template('login.html', error=f"Missing field: {e}")
+            
+            user = users_collection.find_one({"email": email, "password": password})
+            if user:
+                totp = pyotp.TOTP(pyotp.random_base32(), interval=300)
+                otp = totp.now()
+                session['otp'] = otp
+                session['email'] = email
+                session['step'] = 'otp'
+                logger.debug(f"Login OTP for {email}: {otp}")
+                return render_template('login.html', step='otp', email=email, otp=otp)
+            return render_template('login.html', error="Invalid email or password")
+
+        elif session.get('step') == 'otp':
+            try:
+                user_otp = request.form['otp']
+            except KeyError:
+                logger.error("Missing OTP field in login OTP step")
+                return render_template('login.html', step='otp', error="Missing OTP field", email=session.get('email'), otp=session.get('otp'))
+            
+            stored_otp = session.get('otp')
+            if stored_otp and user_otp == stored_otp:
+                session['user_email'] = session.get('email')
+                session.pop('otp', None)
+                session.pop('email', None)
+                session.pop('step', None)
+                return redirect(url_for('index'))
+            return render_template('login.html', step='otp', error="Invalid OTP", email=session.get('email'), otp=session.get('otp'))
+
+    return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        try:
+            email = request.form['email']
+            password = request.form['password']
+        except KeyError as e:
+            logger.error(f"Missing form field in register: {e}")
+            return render_template('register.html', error=f"Missing field: {e}")
+
+        if users_collection.find_one({"email": email}):
+            return render_template('register.html', error="Email already registered")
+
+        totp = pyotp.TOTP(pyotp.random_base32(), interval=300)
+        otp = totp.now()
+        session['otp'] = otp
+        session['email'] = email
+        session['password'] = password
+
+        logger.debug(f"Registration OTP for {email}: {otp}")
+        return render_template('verify_otp.html', email=email, otp=otp)
+
+    return render_template('register.html')
+
+@app.route('/verify_otp', methods=['GET', 'POST'])
+def verify_otp():
+    if request.method == 'POST':
+        try:
+            user_otp = request.form['otp']
+        except KeyError:
+            logger.error("Missing OTP field in verify_otp")
+            return render_template('verify_otp.html', error="Missing OTP field", email=session.get('email'), otp=session.get('otp'))
+
+        stored_otp = session.get('otp')
+        email = session.get('email')
+        password = session.get('password')
+
+        if stored_otp and user_otp == stored_otp:
+            users_collection.insert_one({"email": email, "password": password})
+            session['user_email'] = email
+            session.pop('otp', None)
+            session.pop('email', None)
+            session.pop('password', None)
+            return redirect(url_for('index'))
+        return render_template('verify_otp.html', error="Invalid OTP", email=session.get('email'), otp=session.get('otp'))
+
+    return render_template('verify_otp.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('user_email', None)
+    return redirect(url_for('index'))
 
 @app.route('/product/<product_id>')
 def product_detail(product_id):
@@ -75,13 +176,14 @@ def product_detail(product_id):
             "_id": {"$ne": product["_id"]}
         }).limit(4)
 
-        return render_template('product_detail.html', product=product, recommendations=list(recommendations))
+        user_email = session.get('user_email', None)
+        return render_template('product_detail.html', product=product, recommendations=list(recommendations), user_email=user_email)
     except Exception as e:
         return f"Invalid product ID. Error: {e}", 400
 
 @app.route('/suggest')
 def suggest():
-    query = request.args.get('q', '')
+    query = request.args.get('q', '').strip('+')
     if not query:
         return jsonify([])
 
@@ -95,6 +197,8 @@ def suggest():
 
 @app.route('/chat', methods=['POST'])
 def chat():
+    if 'user_email' not in session:
+        return jsonify({'error': 'Please log in first'}), 401
     user_input = request.json.get("message")
 
     if not user_input:
@@ -120,7 +224,16 @@ def chat():
 
 @app.route('/chat')
 def chat_ui():
-    return render_template('chat.html')
+    if 'user_email' not in session:
+        return redirect(url_for('login'))
+    user_email = session.get('user_email', None)
+    return render_template('chat.html', user_email=user_email)
+
+@app.route('/api/check-session')
+def check_session():
+    if 'user_email' in session:
+        return jsonify({"loggedIn": True, "email": session['user_email']})
+    return jsonify({"loggedIn": False})
 
 @app.route('/shutdown', methods=['POST'])
 def shutdown():
