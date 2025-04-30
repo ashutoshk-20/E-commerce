@@ -17,7 +17,7 @@ app = Flask(__name__)
 app.secret_key = "your_secret_key_change_this"
 
 MONGO_URI = "mongodb://localhost:27017/"
-OPENROUTER_API_KEY = "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"
+OPENROUTER_API_KEY = "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"
 OPENROUTER_MODEL = "deepseek/deepseek-r1-zero:free"
 
 try:
