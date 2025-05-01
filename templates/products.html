@@ -8,14 +8,11 @@
 </head>
 <body class="bg-gray-50 p-4">
     <div class="max-w-6xl mx-auto">
-        <!-- Navigation Bar -->
         <div class="relative mb-8 flex flex-col sm:flex-row items-center justify-between bg-gradient-to-r from-indigo-600 via-purple-700 to-blue-600 p-4 rounded-xl shadow-lg">
-            <!-- Logo or Title -->
             <div class="flex items-center space-x-3 mb-4 sm:mb-0">
                 <h2 class="text-2xl font-bold text-white tracking-tight">Product Hub</h2>
             </div>
 
-            <!-- Search Bar -->
             <form method="get" action="{{ url_for('index') }}" class="relative flex-grow max-w-lg mx-4 w-full sm:w-auto">
                 <div class="relative">
                     <input
@@ -42,13 +39,11 @@
                 <div id="suggestions" class="absolute mt-1 w-full z-50 bg-white/95 backdrop-blur-md border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto top-full left-0"></div>
             </form>
 
-            <!-- Additional Navigation Links and User Icon -->
             <div class="flex items-center space-x-4 mt-4 sm:mt-0">
                 <a href="{{ url_for('index') }}" class="text-white hover:text-blue-200 transition-colors duration-200">Home</a>
                 <a href="{{ url_for('chat_ui') }}" class="px-4 py-2 bg-blue-500 text-white rounded-full font-semibold hover:bg-blue-600 transition-all duration-300 ease-in-out shadow-md">
                     Chat with Bot
                 </a>
-                <!-- User Icon -->
                 {% if user_email %}
                     <div class="relative">
                         <svg id="user-icon" class="w-8 h-8 text-white hover:text-blue-200 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -67,13 +62,12 @@
             </div>
         </div>
 
-        <!-- Product Cards -->
         {% if products %}
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {% for product in products %}
                     <div class="bg-white rounded-lg shadow hover:shadow-lg transition p-4 flex flex-col h-full">
-                        {% if product.ImageURL %}
-                            <img src="{{ product.ImageURL }}" alt="{{ product.Name }}" class="h-48 w-full object-cover rounded-md mb-4">
+                        {% if product.images %}
+                            <img src="{{ product.images }}" alt="{{ product.titles }}" class="h-48 w-full object-cover rounded-md mb-4">
                         {% else %}
                             <div class="h-48 w-full bg-gray-100 flex items-center justify-center rounded-md mb-4">
                                 <div class="text-center text-gray-500">
@@ -85,17 +79,26 @@
                             </div>
                         {% endif %}
                         <div class="flex-grow">
-                            <h3 class="text-lg font-semibold mb-1">{{ product.Name or 'Unnamed Product' }}</h3>
+                            <h3 class="text-lg font-semibold mb-1">{{ product.titles or 'Unnamed Product' }}</h3>
+                            {# Assuming 'Brand' might still be a separate field, keep this check if applicable #}
                             {% if product.Brand %}
                                 <p class="text-gray-600"><strong>Brand:</strong> {{ product.Brand }}</p>
                             {% endif %}
-                            {% if product.price %}
-                                <p class="text-gray-800"><strong>Price:</strong> ${{ product.price }}</p>
+                            {% if product.prices %}
+                                <p class="text-gray-800"><strong>Price:</strong> {{ product.prices }}</p>
+                            {% endif %}
+                             {% if product.ratings %}
+                                <p class="text-yellow-500"><strong>Rating:</strong> {{ product.ratings }} / 5</p>
                             {% endif %}
                         </div>
+                        {# Link using the product's MongoDB _id for internal routing #}
                         <a href="{{ url_for('product_detail', product_id=product._id) }}" class="mt-4 inline-block bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 text-center">
                             View Details
                         </a>
+                         {# Optional: If you want to link directly to the 'purls' from your data uncomment the below #}
+                         {# <a href="{{ product.purls }}" target="_blank" class="mt-4 inline-block bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-center">
+                             Go to Product Page
+                         </a> #}
                     </div>
                 {% endfor %}
             </div>
@@ -103,14 +106,12 @@
             <p class="text-gray-500 text-center mt-6">No products found.</p>
         {% endif %}
 
-        <!-- Pagination -->
         <div class="flex justify-center mt-10">
             <div class="inline-flex space-x-2 items-center">
                 {{ pagination.links | safe }}
             </div>
         </div>
 
-        <!-- Autocomplete Script -->
         <script>
             $(document).ready(function () {
                 $('#searchInput').on('input', function () {
@@ -120,10 +121,12 @@
                         return;
                     }
 
+                    // Adjust the suggestion fetch to search the 'titles' field
                     $.getJSON('/suggest', { q: query }, function (data) {
                         let suggestionBox = $('#suggestions');
                         suggestionBox.empty();
                         data.forEach(function (item) {
+                             // Assuming the suggest endpoint returns titles
                             suggestionBox.append(`
                                 <a href="#" class="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-200 border-b border-gray-100 last:border-b-0">
                                     ${item}

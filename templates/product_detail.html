@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>{{ product.Name or 'Product Details' }}</title>
+    <title>{{ product.titles or 'Product Details' }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50 p-4">
     <div class="max-w-4xl mx-auto">
         <a href="{{ url_for('index') }}" class="text-blue-500 hover:underline mb-4 inline-block">&larr; Back to Products</a>
         <div class="bg-white rounded-lg shadow p-6">
-            {% if product.ImageURL %}
-                <img src="{{ product.ImageURL }}" alt="{{ product.Name }}" class="w-full h-64 object-cover rounded-md mb-4">
+            {% if product.images %}
+                <img src="{{ product.images }}" alt="{{ product.titles }}" class="w-full h-64 object-cover rounded-md mb-4">
             {% else %}
                 <div class="w-full h-64 bg-gray-100 flex items-center justify-center rounded-md mb-4">
                     <div class="text-center text-gray-500">
@@ -21,26 +21,33 @@
                     </div>
                 </div>
             {% endif %}
-            <h2 class="text-2xl font-bold mb-2">{{ product.Name or 'Unnamed Product' }}</h2>
+            <h2 class="text-2xl font-bold mb-2">{{ product.titles or 'Unnamed Product' }}</h2>
             {% if product.Brand %}
                 <p class="text-gray-600 mb-2"><strong>Brand:</strong> {{ product.Brand }}</p>
             {% endif %}
-            {% if product.price %}
-                <p class="text-gray-800 mb-2"><strong>Price:</strong> ${{ product.price }}</p>
+            {% if product.prices %}
+                <p class="text-gray-800 mb-2"><strong>Price:</strong> {{ product.prices }}</p>
             {% endif %}
             {% if product.Category %}
                 <p class="text-gray-600 mb-2"><strong>Category:</strong> {{ product.Category }}</p>
             {% endif %}
+            {% if product.ratings %}
+                <p class="text-yellow-500 mb-2"><strong>Rating:</strong> {{ product.ratings }} / 5</p>
+            {% endif %}
             {% if product.Description %}
                 <p class="text-gray-700 mb-4">{{ product.Description }}</p>
             {% endif %}
+             
+             {% if product.purls %}
+                 <p class="text-blue-600 mb-2 break-words"><small><strong>Product URL:</strong> <a href="{{ product.purls }}" target="_blank" class="hover:underline">{{ product.purls }}</a></small></p>
+             {% endif %}
         </div>
         <h3 class="text-xl font-semibold mt-6 mb-4">Recommended Products</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {% for rec in recommendations %}
                 <div class="bg-white rounded-lg shadow hover:shadow-lg transition p-4 flex flex-col h-full">
-                    {% if rec.ImageURL %}
-                        <img src="{{ rec.ImageURL }}" alt="{{ rec.Name }}" class="h-32 w-full object-cover rounded-md mb-2">
+                    {% if rec.images %}
+                        <img src="{{ rec.images }}" alt="{{ rec.titles }}" class="h-32 w-full object-cover rounded-md mb-2">
                     {% else %}
                         <div class="h-32 w-full bg-gray-100 flex items-center justify-center rounded-md mb-2">
                             <div class="text-center text-gray-500">
@@ -51,12 +58,16 @@
                             </div>
                         </div>
                     {% endif %}
-                    <h4 class="text-lg font-semibold mb-1">{{ rec.Name or 'Unnamed Product' }}</h4>
+                    <h4 class="text-lg font-semibold mb-1">{{ rec.titles or 'Unnamed Product' }}</h4>
+                    
                     <a href="{{ url_for('product_detail', product_id=rec._id) }}" class="mt-auto inline-block bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 text-center">View</a>
+                     
+                     {# <a href="{{ rec.purls }}" target="_blank" class="mt-auto inline-block bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 text-center">
+                         Go to Product Page
+                     </a> #}
                 </div>
             {% endfor %}
         </div>
-        <!-- User Email for Icon (if needed in future) -->
         {% if user_email %}
             <p class="text-gray-600 mt-4">Logged in as: {{ user_email }}</p>
         {% endif %}

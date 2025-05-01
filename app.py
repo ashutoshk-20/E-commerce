@@ -8,28 +8,31 @@ import threading
 import pyotp
 import logging
 import json
-import re
+import re,os
+from dotenv import load_dotenv
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.secret_key = "your_secret_key_change_this"
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "a_fallback_secret_key_if_env_missing")
 
-MONGO_URI = "mongodb://localhost:27017/"
-OPENROUTER_API_KEY = "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"
-OPENROUTER_MODEL = "deepseek/deepseek-r1-zero:free"
+load_dotenv()
+
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-r1-zero:free")
 
 try:
     mongo_client = MongoClient(MONGO_URI)
     mongo_client.admin.command('ping')
     db = mongo_client["product_data"]
-    collection = db["products"]
+    collection = db["tech_data"] 
     users_collection = db["users"]
     logger.info("MongoDB connection successful.")
 except Exception as e:
     logger.error(f"Failed to connect to MongoDB: {e}")
-    mongo_client = None # Set to None if connection fails
+    mongo_client = None 
 
 if not OPENROUTER_API_KEY or OPENROUTER_API_KEY == "your_valid_openrouter_api_key_here":
      logger.error("OPENROUTER_API_KEY is not set or is the default placeholder. Chat functionality will fail.")
@@ -55,7 +58,7 @@ def index():
     if query:
         search_filter = {
             "$or": [
-                {"Name": {"$regex": query, "$options": "i"}},
+                {"titles": {"$regex": query, "$options": "i"}},
                 {"Brand": {"$regex": query, "$options": "i"}}
             ]
         }
@@ -193,7 +196,7 @@ def verify_otp():
                  logger.error(f"Error saving user to MongoDB after OTP verification: {e}")
                  return render_template('verify_otp.html', error="An error occurred while finalizing registration.")
 
-        return render_template('verify_otp.html', error="Invalid OTP", email=session.get('email'), otp=session.get('otp'))
+        return render_template('verify_otp.html', email=session.get('email'), otp=session.get('otp'))
 
     return render_template('verify_otp.html', email=session.get('email'), otp=session.get('otp'))
 
@@ -240,11 +243,11 @@ def suggest():
 
     try:
         results = collection.find(
-            {"Name": {"$regex": f'^{re.escape(query)}', "$options": "i"}},
-            {"Name": 1, "_id": 0}
+            {"titles": {"$regex": f'^{re.escape(query)}', "$options": "i"}},
+            {"titles": 1, "_id": 0}
         ).limit(10)
 
-        suggestions = [item.get('Name') for item in results if item.get('Name')]
+        suggestions = [item.get('titles') for item in results if item.get('titles')]
         return jsonify(suggestions)
     except Exception as e:
         logger.error(f"Error fetching suggestions for query '{query}': {e}")
@@ -269,43 +272,43 @@ def chat():
     ]
 
     product_data_for_ai = None
-    product_keywords = ["product", "item", "about", "details", "info"]
+    product_keywords = ["product", "item", "about", "details", "info", "title", "name"]
     if any(keyword in user_input.lower() for keyword in product_keywords):
         logger.debug(f"Potential product query detected: {user_input}")
         name_match = re.search(r'\b([A-Z][a-zA-Z0-9\s]+)\b', user_input)
-        product_name_guess = name_match.group(1).strip() if name_match else None
+        product_title_guess = name_match.group(1).strip() if name_match else None
 
-        if not product_name_guess:
+        if not product_title_guess:
              quoted_match = re.search(r'"(.*?)"|\'(.*?)\'', user_input)
              if quoted_match:
-                 product_name_guess = quoted_match.group(1) or quoted_match.group(2)
-                 if product_name_guess:
-                      product_name_guess = product_name_guess.strip()
+                 product_title_guess = quoted_match.group(1) or quoted_match.group(2)
+                 if product_title_guess:
+                      product_title_guess = product_title_guess.strip()
 
-        if product_name_guess:
-            logger.debug(f"Attempting to find product with name guess: '{product_name_guess}'")
+        if product_title_guess:
+            logger.debug(f"Attempting to find product with title guess: '{product_title_guess}'")
             try:
-                if ' ' in product_name_guess:
-                     product = collection.find_one({"Name": {"$regex": r"\b" + re.escape(product_name_guess) + r"\b", "$options": "i"}})
+                if ' ' in product_title_guess:
+                     product = collection.find_one({"titles": {"$regex": r"\b" + re.escape(product_title_guess) + r"\b", "$options": "i"}})
                 else:
-                    product = collection.find_one({"Name": {"$regex": f"^{re.escape(product_name_guess)}", "$options": "i"}})
+                    product = collection.find_one({"titles": {"$regex": f"^{re.escape(product_title_guess)}", "$options": "i"}})
 
                 if product:
-                    logger.debug(f"Product found: {product.get('Name')}")
-                    product_dict = {k: (float(v) if isinstance(v, ObjectId) else v) for k, v in product.items() if k != '_id'}
+                    logger.debug(f"Product found: {product.get('titles')}")
+                    product_dict = {k: (str(v) if isinstance(v, ObjectId) else v) for k, v in product.items()}
                     product_data_for_ai = json.dumps(product_dict)
 
                     messages.append({"role": "user", "content": f"Database Context (Product Info): {product_data_for_ai}"})
                 else:
-                    logger.debug(f"Product not found for name guess: '{product_name_guess}'")
-                    messages.append({"role": "user", "content": f"Database Context: No specific product found matching '{product_name_guess}'."})
+                    logger.debug(f"Product not found for title guess: '{product_title_guess}'")
+                    messages.append({"role": "user", "content": f"Database Context: No specific product found matching '{product_title_guess}'."})
 
             except Exception as e:
                 logger.error(f"Error accessing MongoDB for product lookup: {e}")
                 messages.append({"role": "user", "content": f"Database Context: An error occurred while looking up product information: {e}"})
         else:
-             logger.debug("No potential product name extracted from user input.")
-             messages.append({"role": "user", "content": "Database Context: Could not identify a specific product name to look up."})
+             logger.debug("No potential product title extracted from user input.")
+             messages.append({"role": "user", "content": "Database Context: Could not identify a specific product title to look up."})
 
     messages.append({"role": "user", "content": f"User's original question: {user_input}"})
 
@@ -348,7 +351,6 @@ def shutdown():
         return jsonify({"message": "Remote shutdown not allowed."}), 403
 
     logger.info("Shutdown requested...")
-    shutdown_flag.set()
     func = request.environ.get('werkzeug.server.shutdown')
     if func is None:
         logger.error("Not running with the Werkzeug Server, shutdown not possible this way.")
@@ -368,7 +370,7 @@ def run_server():
 if __name__ == '__main__':
     logger.info("Starting Flask server in a separate thread.")
     server_thread = threading.Thread(target=run_server)
-    server_thread.daemon = True
+    server_thread.daemon = True 
     server_thread.start()
     logger.info("Server thread started. Press Ctrl+C to stop.")
 
@@ -377,11 +379,12 @@ if __name__ == '__main__':
             shutdown_flag.wait(timeout=1)
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received. Setting shutdown flag.")
-        shutdown_flag.set()
+        shutdown_flag.set() 
     finally:
         logger.info("Main thread waiting for server thread to join.")
         if server_thread.is_alive():
              server_thread.join(timeout=5)
              if server_thread.is_alive():
                  logger.warning("Server thread did not terminate gracefully.")
-        print("Server stopped gracefully." if not server_thread.is_alive() else "Server stopped.")
+             else:
+                 logger.info("Server thread terminated gracefully.")
